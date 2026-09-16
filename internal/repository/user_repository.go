@@ -22,7 +22,7 @@ type userRepository struct {
 
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepository{
-		db: db
+		db: db,
 	}
 }
 
