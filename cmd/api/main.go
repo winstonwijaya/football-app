@@ -34,12 +34,15 @@ func main() {
 
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
+	teamRepo := repository.NewTeamRepository(db)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
+	teamService := service.NewTeamService(teamRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
+	teamHandler := handler.NewTeamHandler(teamService)
 
 	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
@@ -54,6 +57,15 @@ func main() {
 
 	v1 := router.Group("/api/v1")
 	v1.POST("/auth/login", authHandler.Login)
+
+	protected := v1.Group("")
+	protected.Use(middleware.RequireAuth(cfg.JWT.Secret))
+
+	protected.GET("/teams", teamHandler.List)
+	protected.POST("/teams", teamHandler.Create)
+	protected.GET("/teams/:id", teamHandler.Get)
+	protected.PUT("/teams/:id", teamHandler.Update)
+	protected.DELETE("/teams/:id", teamHandler.Delete)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
