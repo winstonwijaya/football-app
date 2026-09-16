@@ -17,8 +17,22 @@ import (
 func main() {
 	cfg := config.Load()
 
+	db, err := config.Connect(cfg.DB)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to get underlying sql.DB: %v", err)
+	}
+	defer sqlDB.Close()
+
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) {
+		if err := sqlDB.PingContext(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "db unreachable"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
