@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"football-app/internal/model"
 )
@@ -36,6 +37,11 @@ type MatchRepository interface {
 	UpdateWithConflictCheck(ctx context.Context, match *model.Match) error
 	// SoftDelete returns gorm.ErrRecordNotFound if no active match matches id.
 	SoftDelete(ctx context.Context, id int64, deletedBy int64) error
+	// ReportResult writes match's home_score/away_score/status and all
+	// logs rows in one transaction, row-locking the match first so two
+	// concurrent reports on the same match can't both succeed. Returns
+	// ErrConflict if the match has already been reported.
+	ReportResult(ctx context.Context, match *model.Match, logs []model.MatchLog, userID int64) error
 }
 
 type matchRepository struct {
@@ -137,6 +143,38 @@ func (r *matchRepository) SoftDelete(ctx context.Context, id int64, deletedBy in
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *matchRepository) ReportResult(ctx context.Context, match *model.Match, logs []model.MatchLog, userID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var current model.Match
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND deleted_at IS NULL", match.ID).
+			First(&current).Error
+		if err != nil {
+			return err
+		}
+		if current.Status == model.MatchStatusPlayed {
+			return ErrConflict
+		}
+
+		if err := tx.Model(&model.Match{}).
+			Where("id = ?", match.ID).
+			Select("home_score", "away_score", "status", "updated_at", "updated_by").
+			Updates(match).Error; err != nil {
+			return err
+		}
+
+		for i := range logs {
+			logs[i].CreatedBy = &userID
+		}
+		if len(logs) > 0 {
+			if err := tx.Create(&logs).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // hasScheduleConflict reports whether homeTeamID or awayTeamID already has

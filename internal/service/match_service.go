@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 
@@ -12,15 +13,19 @@ import (
 	"football-app/pkg/apperror"
 )
 
-const scheduleConflictMessage = "a team in this match already has a match scheduled on this date"
+const (
+	scheduleConflictMessage = "a team in this match already has a match scheduled on this date"
+	resultConflictMessage   = "match result has already been reported"
+)
 
 type MatchService struct {
 	matches repository.MatchRepository
 	teams   repository.TeamRepository
+	players repository.PlayerRepository
 }
 
-func NewMatchService(matches repository.MatchRepository, teams repository.TeamRepository) *MatchService {
-	return &MatchService{matches: matches, teams: teams}
+func NewMatchService(matches repository.MatchRepository, teams repository.TeamRepository, players repository.PlayerRepository) *MatchService {
+	return &MatchService{matches: matches, teams: teams, players: players}
 }
 
 func (s *MatchService) Create(ctx context.Context, req dto.CreateMatchRequest, userID int64) (*dto.MatchResponse, error) {
@@ -151,6 +156,122 @@ func (s *MatchService) Delete(ctx context.Context, id int64, userID int64) error
 		return apperror.Internal(err)
 	}
 	return nil
+}
+
+// ReportResult is a state transition, not a field update: it validates the
+// submitted goals reconcile with the score, then writes the match's final
+// score/status and every match_logs row in one transaction.
+func (s *MatchService) ReportResult(ctx context.Context, matchID int64, req dto.ReportResultRequest, userID int64) (*dto.MatchResponse, error) {
+	match, err := s.matches.FindByID(ctx, matchID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperror.NotFound("match not found")
+	}
+	if err != nil {
+		return nil, apperror.Internal(err)
+	}
+	if match.Status == model.MatchStatusPlayed {
+		return nil, apperror.Conflict(resultConflictMessage)
+	}
+	if match.Status == model.MatchStatusCancelled {
+		return nil, apperror.Conflict("cannot report a result for a cancelled match")
+	}
+
+	logs, err := s.buildAndValidateGoals(ctx, match, req)
+	if err != nil {
+		return nil, err
+	}
+
+	match.HomeScore = &req.HomeScore
+	match.AwayScore = &req.AwayScore
+	match.Status = model.MatchStatusPlayed
+	match.UpdatedBy = &userID
+
+	if err := s.matches.ReportResult(ctx, match, logs, userID); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return nil, apperror.Conflict(resultConflictMessage)
+		}
+		return nil, apperror.Internal(err)
+	}
+
+	resp := matchToResponse(*match)
+	return &resp, nil
+}
+
+// buildAndValidateGoals checks every goal against the match (team_id must
+// be home or away) and the scorer (must exist, and must belong to the
+// credited team unless it's an own goal — then it must belong to the
+// opposing team), and that the goal counts reconcile with the submitted
+// score. All problems are collected into one apperror.Validation instead
+// of failing on the first one.
+func (s *MatchService) buildAndValidateGoals(ctx context.Context, match *model.Match, req dto.ReportResultRequest) ([]model.MatchLog, error) {
+	fields := map[string]string{}
+	homeCount, awayCount := 0, 0
+	logs := make([]model.MatchLog, 0, len(req.Goals))
+
+	for i, g := range req.Goals {
+		prefix := fmt.Sprintf("goals[%d]", i)
+
+		if g.TeamID != match.HomeTeamID && g.TeamID != match.AwayTeamID {
+			fields[prefix+".team_id"] = "must be the home or away team of this match"
+			continue
+		}
+
+		player, err := s.players.FindByID(ctx, g.PlayerID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			fields[prefix+".player_id"] = "player not found"
+			continue
+		}
+		if err != nil {
+			return nil, apperror.Internal(err)
+		}
+
+		expectedPlayerTeam := g.TeamID
+		if g.IsOwnGoal {
+			expectedPlayerTeam = otherTeam(match, g.TeamID)
+		}
+		if player.TeamID != expectedPlayerTeam {
+			if g.IsOwnGoal {
+				fields[prefix+".player_id"] = "own goal must be scored by a player on the opposing team"
+			} else {
+				fields[prefix+".player_id"] = "player does not belong to the credited team"
+			}
+			continue
+		}
+
+		if g.TeamID == match.HomeTeamID {
+			homeCount++
+		} else {
+			awayCount++
+		}
+
+		logs = append(logs, model.MatchLog{
+			MatchID:   match.ID,
+			TeamID:    g.TeamID,
+			PlayerID:  g.PlayerID,
+			Action:    model.MatchLogActionGoal,
+			Minute:    g.Minute,
+			IsOwnGoal: g.IsOwnGoal,
+		})
+	}
+
+	if homeCount != int(req.HomeScore) {
+		fields["home_score"] = fmt.Sprintf("does not match number of goals credited to the home team (%d)", homeCount)
+	}
+	if awayCount != int(req.AwayScore) {
+		fields["away_score"] = fmt.Sprintf("does not match number of goals credited to the away team (%d)", awayCount)
+	}
+
+	if len(fields) > 0 {
+		return nil, apperror.Validation("goals do not reconcile with the submitted score", fields)
+	}
+	return logs, nil
+}
+
+func otherTeam(match *model.Match, teamID int64) int64 {
+	if teamID == match.HomeTeamID {
+		return match.AwayTeamID
+	}
+	return match.HomeTeamID
 }
 
 func (s *MatchService) requireTeam(ctx context.Context, teamID int64) error {

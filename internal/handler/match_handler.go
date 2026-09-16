@@ -89,6 +89,28 @@ func (h *MatchHandler) Update(c *gin.Context) {
 	response.OK(c, http.StatusOK, resp)
 }
 
+// ReportResult handles POST /api/v1/matches/:id/result
+func (h *MatchHandler) ReportResult(c *gin.Context) {
+	id, err := idParam(c)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	var req dto.ReportResultRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+
+	resp, err := h.service.ReportResult(c.Request.Context(), id, req, userID(c))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	response.OK(c, http.StatusOK, resp)
+}
+
 // Delete handles DELETE /api/v1/matches/:id
 func (h *MatchHandler) Delete(c *gin.Context) {
 	id, err := idParam(c)

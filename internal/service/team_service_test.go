@@ -36,7 +36,8 @@ func (f *fakeTeamRepository) FindByID(_ context.Context, id int64) (*model.Team,
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return team, nil
+	cp := *team
+	return &cp, nil
 }
 
 func (f *fakeTeamRepository) List(_ context.Context, _ repository.TeamFilter) ([]model.Team, int64, error) {

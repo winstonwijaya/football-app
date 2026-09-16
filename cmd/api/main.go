@@ -42,7 +42,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
 	teamService := service.NewTeamService(teamRepo)
 	playerService := service.NewPlayerService(playerRepo, teamRepo)
-	matchService := service.NewMatchService(matchRepo, teamRepo)
+	matchService := service.NewMatchService(matchRepo, teamRepo, playerRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -85,6 +85,7 @@ func main() {
 	protected.GET("/matches/:id", matchHandler.Get)
 	protected.PUT("/matches/:id", matchHandler.Update)
 	protected.DELETE("/matches/:id", matchHandler.Delete)
+	protected.POST("/matches/:id/result", matchHandler.ReportResult)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
