@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,15 @@ import (
 // touch gin's raw binding errors.
 func bindJSON(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindJSON(obj); err != nil {
+		return toValidationError(err)
+	}
+	return nil
+}
+
+// bindQuery binds and validates query-string parameters the same way
+// bindJSON does for the body.
+func bindQuery(c *gin.Context, obj interface{}) error {
+	if err := c.ShouldBindQuery(obj); err != nil {
 		return toValidationError(err)
 	}
 	return nil
@@ -39,9 +49,15 @@ func fieldErrorMessage(fe validator.FieldError) string {
 	case "required":
 		return "is required"
 	case "max":
+		if isNumericKind(fe.Kind()) {
+			return fmt.Sprintf("must be at most %s", fe.Param())
+		}
 		return fmt.Sprintf("must be at most %s characters", fe.Param())
 	case "min":
-		return fmt.Sprintf("must be at least %s", fe.Param())
+		if isNumericKind(fe.Kind()) {
+			return fmt.Sprintf("must be at least %s", fe.Param())
+		}
+		return fmt.Sprintf("must be at least %s characters", fe.Param())
 	case "gte":
 		return fmt.Sprintf("must be >= %s", fe.Param())
 	case "lte":
@@ -52,5 +68,16 @@ func fieldErrorMessage(fe validator.FieldError) string {
 		return fmt.Sprintf("must be one of [%s]", strings.ReplaceAll(fe.Param(), " ", ", "))
 	default:
 		return fmt.Sprintf("failed validation: %s", fe.Tag())
+	}
+}
+
+func isNumericKind(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	default:
+		return false
 	}
 }
