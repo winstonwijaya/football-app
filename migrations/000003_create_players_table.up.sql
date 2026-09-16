@@ -1,5 +1,5 @@
 -- Add enum for the player positions, can be adjusted as needed
-CREATE TYPE player_positions AS ENUM ('Goalkeeper', 'Fullback', 'Centre Back', 'Defensive Midfielder', 'Central Midfielder', 'Attacking Midfielder', 'Winger', 'Striker');
+CREATE TYPE player_positions AS ENUM ('Forward', 'Midfielder', 'Defender', 'Goalkeeper');
 
 CREATE TABLE players (
     id           BIGSERIAL PRIMARY KEY,

@@ -17,10 +17,14 @@ type ErrorBody struct {
 	Fields  map[string]string `json:"fields,omitempty"`
 }
 
+// Meta is only ever sent behind a non-nil *Meta pointer (OKWithMeta), which
+// already makes it optional at the envelope level — so its own fields don't
+// need omitempty, and shouldn't: a legitimate zero total should still
+// render as "total":0, not disappear.
 type Meta struct {
-	Page  int   `json:"page,omitempty"`
-	Limit int   `json:"limit,omitempty"`
-	Total int64 `json:"total,omitempty"`
+	Page  int   `json:"page"`
+	Limit int   `json:"limit"`
+	Total int64 `json:"total"`
 }
 
 // OK writes a successful envelope with no pagination metadata.

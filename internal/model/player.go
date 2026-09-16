@@ -6,14 +6,10 @@ package model
 type PlayerPosition string
 
 const (
-	PositionGoalkeeper          PlayerPosition = "Goalkeeper"
-	PositionFullback            PlayerPosition = "Fullback"
-	PositionCentreBack          PlayerPosition = "Centre Back"
-	PositionDefensiveMidfielder PlayerPosition = "Defensive Midfielder"
-	PositionCentralMidfielder   PlayerPosition = "Central Midfielder"
-	PositionAttackingMidfielder PlayerPosition = "Attacking Midfielder"
-	PositionWinger              PlayerPosition = "Winger"
-	PositionStriker             PlayerPosition = "Striker"
+	PositionForward    PlayerPosition = "Forward"
+	PositionMidfielder PlayerPosition = "Midfielder"
+	PositionDefender   PlayerPosition = "Defender"
+	PositionGoalkeeper PlayerPosition = "Goalkeeper"
 )
 
 type Player struct {
