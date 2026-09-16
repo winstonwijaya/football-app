@@ -12,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"football-app/internal/config"
+	"football-app/internal/middleware"
+	"football-app/pkg/response"
 )
 
 func main() {
@@ -28,12 +30,14 @@ func main() {
 	defer sqlDB.Close()
 
 	router := gin.Default()
+	router.Use(middleware.ErrorHandler())
+
 	router.GET("/health", func(c *gin.Context) {
 		if err := sqlDB.PingContext(c.Request.Context()); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "db unreachable"})
+			response.Error(c, http.StatusServiceUnavailable, "DB_UNREACHABLE", "database unreachable", nil)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		response.OK(c, http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	srv := &http.Server{
