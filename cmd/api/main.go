@@ -54,7 +54,10 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportService)
 
 	router := gin.Default()
+	router.Use(middleware.RequestID())
 	router.Use(middleware.ErrorHandler())
+	// General abuse guard: 10 req/s sustained, burst 20, per client IP.
+	router.Use(middleware.RateLimiter(10, 20))
 
 	router.GET("/health", func(c *gin.Context) {
 		if err := sqlDB.PingContext(c.Request.Context()); err != nil {
@@ -65,7 +68,9 @@ func main() {
 	})
 
 	v1 := router.Group("/api/v1")
-	v1.POST("/auth/login", authHandler.Login)
+	// Stricter brute-force guard on login specifically: ~5 attempts/min
+	// sustained, burst 5, per client IP — on top of the general limiter above.
+	v1.POST("/auth/login", middleware.RateLimiter(5.0/60.0, 5), authHandler.Login)
 
 	protected := v1.Group("")
 	protected.Use(middleware.RequireAuth(cfg.JWT.Secret))

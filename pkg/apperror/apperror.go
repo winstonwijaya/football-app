@@ -6,12 +6,13 @@ package apperror
 type Code string
 
 const (
-	CodeValidation   Code = "VALIDATION_ERROR"
-	CodeNotFound     Code = "NOT_FOUND"
-	CodeConflict     Code = "CONFLICT"
-	CodeUnauthorized Code = "UNAUTHORIZED"
-	CodeForbidden    Code = "FORBIDDEN"
-	CodeInternal     Code = "INTERNAL_ERROR"
+	CodeValidation      Code = "VALIDATION_ERROR"
+	CodeNotFound        Code = "NOT_FOUND"
+	CodeConflict        Code = "CONFLICT"
+	CodeUnauthorized    Code = "UNAUTHORIZED"
+	CodeForbidden       Code = "FORBIDDEN"
+	CodeTooManyRequests Code = "TOO_MANY_REQUESTS"
+	CodeInternal        Code = "INTERNAL_ERROR"
 )
 
 type Error struct {
@@ -50,6 +51,10 @@ func Unauthorized(message string) *Error {
 
 func Forbidden(message string) *Error {
 	return &Error{Code: CodeForbidden, Message: message}
+}
+
+func TooManyRequests(message string) *Error {
+	return &Error{Code: CodeTooManyRequests, Message: message}
 }
 
 // Internal wraps an unexpected error (e.g. a DB failure). The wrapped error

@@ -30,13 +30,13 @@ func ErrorHandler() gin.HandlerFunc {
 		var appErr *apperror.Error
 		if errors.As(err, &appErr) {
 			if appErr.Err != nil {
-				log.Printf("request error [%s]: %v (cause: %v)", appErr.Code, appErr.Message, appErr.Err)
+				log.Printf("[%s] request error [%s]: %v (cause: %v)", RequestIDFrom(c), appErr.Code, appErr.Message, appErr.Err)
 			}
 			response.Error(c, statusForCode(appErr.Code), string(appErr.Code), appErr.Message, appErr.Fields)
 			return
 		}
 
-		log.Printf("unhandled error: %v", err)
+		log.Printf("[%s] unhandled error: %v", RequestIDFrom(c), err)
 		response.Error(c, http.StatusInternalServerError, string(apperror.CodeInternal), "internal server error", nil)
 	}
 }
@@ -53,6 +53,8 @@ func statusForCode(code apperror.Code) int {
 		return http.StatusUnauthorized
 	case apperror.CodeForbidden:
 		return http.StatusForbidden
+	case apperror.CodeTooManyRequests:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}
