@@ -1,0 +1,268 @@
+{
+  "info": {
+    "name": "Football Team Management API",
+    "description": "Backend API for managing amateur football teams, players, match schedules, and match results. Run Auth > Login first — it auto-saves the access token into {{access_token}}, which every other request uses via Bearer auth. Requests assume a fresh database (e.g. right after `docker compose up`): Home team = id 1, Away team = id 2, players 1-3, match = id 1. The Cleanup folder is separate at the end since deleting a team/player/match mid-collection would break the requests that depend on it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "access_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var loginData = pm.response.json();",
+                  "if (loginData.success) {",
+                  "    pm.collectionVariables.set('access_token', loginData.data.access_token);",
+                  "    pm.test('access_token saved', function () { pm.expect(loginData.data.access_token).to.be.a('string'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin12345\"\n}"
+            },
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/teams?city=&search=&page=1&limit=20"
+          }
+        },
+        {
+          "name": "Create Team (Home)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/teams",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Home FC\",\n  \"logo_url\": \"https://example.com/logo-home.png\",\n  \"established_year\": 2010,\n  \"address\": \"Jl. Contoh No. 1\",\n  \"city\": \"Jakarta\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Team (Away)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/teams",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Away FC\",\n  \"logo_url\": \"https://example.com/logo-away.png\",\n  \"established_year\": 2012,\n  \"address\": \"Jl. Contoh No. 2\",\n  \"city\": \"Bandung\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Team",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/teams/1" }
+        },
+        {
+          "name": "Update Team",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/teams/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Home FC\",\n  \"city\": \"Surabaya\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Team's Players",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/teams/1/players" }
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "List Players",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/players?team_id=&position=&page=1&limit=20"
+          }
+        },
+        {
+          "name": "Create Player 1 (Home)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"team_id\": 1,\n  \"name\": \"Home Striker\",\n  \"height_cm\": 180.5,\n  \"weight_kg\": 75,\n  \"position\": \"Forward\",\n  \"squad_number\": 9\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Player 2 (Away)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"team_id\": 2,\n  \"name\": \"Away Striker\",\n  \"height_cm\": 178,\n  \"weight_kg\": 72,\n  \"position\": \"Forward\",\n  \"squad_number\": 9\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Player 3 (Away, for own-goal example)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/players",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"team_id\": 2,\n  \"name\": \"Away Defender\",\n  \"position\": \"Defender\",\n  \"squad_number\": 4\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Player",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/players/1" }
+        },
+        {
+          "name": "Update Player",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/players/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"team_id\": 1,\n  \"name\": \"Home Striker\",\n  \"position\": \"Forward\",\n  \"squad_number\": 11\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Matches",
+      "item": [
+        {
+          "name": "List Matches",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/matches?status=&team_id=&from=&to=&page=1&limit=20"
+          }
+        },
+        {
+          "name": "Create Match",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/matches",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"home_team_id\": 1,\n  \"away_team_id\": 2,\n  \"match_datetime\": \"2026-10-01T15:00:00Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Match",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/matches/1" }
+        },
+        {
+          "name": "Update Match (reschedule)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/matches/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"home_team_id\": 1,\n  \"away_team_id\": 2,\n  \"match_datetime\": \"2026-10-02T15:00:00Z\",\n  \"status\": \"Scheduled\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Report Match Result",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/matches/1/result",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"home_score\": 2,\n  \"away_score\": 1,\n  \"goals\": [\n    { \"team_id\": 1, \"player_id\": 1, \"minute\": 15, \"is_own_goal\": false },\n    { \"team_id\": 2, \"player_id\": 2, \"minute\": 40, \"is_own_goal\": false },\n    { \"team_id\": 1, \"player_id\": 3, \"minute\": 70, \"is_own_goal\": true }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "List Match Reports",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/reports/matches?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Get Match Report",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/reports/matches/1" }
+        }
+      ]
+    },
+    {
+      "name": "Cleanup (run individually, not top-to-bottom)",
+      "item": [
+        {
+          "name": "Delete Match (blocked once Played -> 409)",
+          "request": { "method": "DELETE", "url": "{{base_url}}/api/v1/matches/1" }
+        },
+        {
+          "name": "Delete Player",
+          "request": { "method": "DELETE", "url": "{{base_url}}/api/v1/players/1" }
+        },
+        {
+          "name": "Delete Team",
+          "request": { "method": "DELETE", "url": "{{base_url}}/api/v1/teams/1" }
+        }
+      ]
+    }
+  ]
+}
