@@ -2,12 +2,16 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strconv"
+	"time"
 )
 
 type Config struct {
 	Port string
 	DB   DBConfig
+	JWT  JWTConfig
 }
 
 type DBConfig struct {
@@ -17,6 +21,11 @@ type DBConfig struct {
 	Password string
 	Name     string
 	SSLMode  string
+}
+
+type JWTConfig struct {
+	Secret string
+	TTL    time.Duration
 }
 
 func Load() Config {
@@ -30,6 +39,25 @@ func Load() Config {
 			Name:     getEnv("DB_NAME", "football"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
+		JWT: loadJWTConfig(),
+	}
+}
+
+func loadJWTConfig() JWTConfig {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "dev-secret-change-me"
+		log.Println("WARNING: JWT_SECRET not set, using an insecure default. Set JWT_SECRET in any non-local environment.")
+	}
+
+	tokenDuration, err := strconv.Atoi(getEnv("JWT_EXPIRY_MINUTES", "60"))
+	if err != nil || minutes <= 0 {
+		minutes = 60
+	}
+
+	return JWTConfig{
+		Secret: secret,
+		TTL:    time.Duration(tokenDuration) * time.Minute,
 	}
 }
 
