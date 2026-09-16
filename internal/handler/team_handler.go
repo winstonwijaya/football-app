@@ -11,11 +11,12 @@ import (
 )
 
 type TeamHandler struct {
-	service *service.TeamService
+	service       *service.TeamService
+	playerService *service.PlayerService
 }
 
-func NewTeamHandler(service *service.TeamService) *TeamHandler {
-	return &TeamHandler{service: service}
+func NewTeamHandler(service *service.TeamService, playerService *service.PlayerService) *TeamHandler {
+	return &TeamHandler{service: service, playerService: playerService}
 }
 
 // Create handles POST /api/v1/teams
@@ -92,6 +93,36 @@ func (h *TeamHandler) Update(c *gin.Context) {
 	}
 
 	response.OK(c, http.StatusOK, resp)
+}
+
+// ListPlayers handles GET /api/v1/teams/:id/players
+func (h *TeamHandler) ListPlayers(c *gin.Context) {
+	teamID, err := idParam(c)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	if _, err := h.service.Get(c.Request.Context(), teamID); err != nil {
+		c.Error(err)
+		return
+	}
+
+	var query dto.ListPlayersQuery
+	if err := bindQuery(c, &query); err != nil {
+		c.Error(err)
+		return
+	}
+	query.TeamID = &teamID
+	query.Normalize()
+
+	items, total, err := h.playerService.List(c.Request.Context(), query)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	response.OKWithMeta(c, http.StatusOK, items, response.Meta{Page: query.Page, Limit: query.Limit, Total: total})
 }
 
 // Delete handles DELETE /api/v1/teams/:id
