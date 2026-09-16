@@ -64,6 +64,10 @@ func fieldErrorMessage(fe validator.FieldError) string {
 		return fmt.Sprintf("must be <= %s", fe.Param())
 	case "url":
 		return "must be a valid URL"
+	case "nefield":
+		return fmt.Sprintf("must be different from %s", fe.Param())
+	case "gt":
+		return fmt.Sprintf("must be greater than %s", fe.Param())
 	case "oneof":
 		return fmt.Sprintf("must be one of [%s]", strings.Join(splitOneOfParam(fe.Param()), ", "))
 	default:
