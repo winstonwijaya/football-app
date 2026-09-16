@@ -1,5 +1,4 @@
 -- Add enum for status of the match
-DROP TYPE IF EXISTS match_status;
 CREATE TYPE match_status AS ENUM ('Scheduled', 'Played', 'Cancelled');
 
 CREATE TABLE matches (

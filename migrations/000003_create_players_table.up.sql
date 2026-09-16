@@ -1,5 +1,4 @@
 -- Add enum for the player positions, can be adjusted as needed
-DROP ENUM IF EXISTS player_positions;
 CREATE TYPE player_positions AS ENUM ('Goalkeeper', 'Fullback', 'Centre Back', 'Defensive Midfielder', 'Central Midfielder', 'Attacking Midfielder', 'Winger', 'Striker');
 
 CREATE TABLE players (
