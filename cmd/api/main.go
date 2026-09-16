@@ -12,7 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"football-app/internal/config"
+	"football-app/internal/handler"
 	"football-app/internal/middleware"
+	"football-app/internal/repository"
+	"football-app/internal/service"
 	"football-app/pkg/response"
 )
 
@@ -29,6 +32,15 @@ func main() {
 	}
 	defer sqlDB.Close()
 
+	// Repositories
+	userRepo := repository.NewUserRepository(db)
+
+	// Services
+	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
+
+	// Handlers
+	authHandler := handler.NewAuthHandler(authService)
+
 	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
 
@@ -39,6 +51,9 @@ func main() {
 		}
 		response.OK(c, http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	v1 := router.Group("/api/v1")
+	v1.POST("/auth/login", authHandler.Login)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

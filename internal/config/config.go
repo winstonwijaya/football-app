@@ -51,8 +51,8 @@ func loadJWTConfig() JWTConfig {
 	}
 
 	tokenDuration, err := strconv.Atoi(getEnv("JWT_EXPIRY_MINUTES", "60"))
-	if err != nil || minutes <= 0 {
-		minutes = 60
+	if err != nil || tokenDuration <= 0 {
+		tokenDuration = 60
 	}
 
 	return JWTConfig{
