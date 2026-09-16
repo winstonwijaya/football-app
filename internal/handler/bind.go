@@ -65,10 +65,36 @@ func fieldErrorMessage(fe validator.FieldError) string {
 	case "url":
 		return "must be a valid URL"
 	case "oneof":
-		return fmt.Sprintf("must be one of [%s]", strings.ReplaceAll(fe.Param(), " ", ", "))
+		return fmt.Sprintf("must be one of [%s]", strings.Join(splitOneOfParam(fe.Param()), ", "))
 	default:
 		return fmt.Sprintf("failed validation: %s", fe.Tag())
 	}
+}
+
+// splitOneOfParam splits a validator "oneof" tag param on whitespace,
+// respecting single-quoted multi-word values (e.g. "a b 'c d' e" ->
+// ["a", "b", "c d", "e"]), matching validator's own oneof quoting syntax.
+func splitOneOfParam(param string) []string {
+	var out []string
+	var cur strings.Builder
+	inQuote := false
+	for _, r := range param {
+		switch {
+		case r == '\'':
+			inQuote = !inQuote
+		case r == ' ' && !inQuote:
+			if cur.Len() > 0 {
+				out = append(out, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if cur.Len() > 0 {
+		out = append(out, cur.String())
+	}
+	return out
 }
 
 func isNumericKind(kind reflect.Kind) bool {

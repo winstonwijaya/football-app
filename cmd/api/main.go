@@ -35,14 +35,17 @@ func main() {
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	teamRepo := repository.NewTeamRepository(db)
+	playerRepo := repository.NewPlayerRepository(db)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, cfg.JWT.TTL)
 	teamService := service.NewTeamService(teamRepo)
+	playerService := service.NewPlayerService(playerRepo, teamRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
-	teamHandler := handler.NewTeamHandler(teamService)
+	teamHandler := handler.NewTeamHandler(teamService, playerService)
+	playerHandler := handler.NewPlayerHandler(playerService)
 
 	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
@@ -66,6 +69,13 @@ func main() {
 	protected.GET("/teams/:id", teamHandler.Get)
 	protected.PUT("/teams/:id", teamHandler.Update)
 	protected.DELETE("/teams/:id", teamHandler.Delete)
+	protected.GET("/teams/:id/players", teamHandler.ListPlayers)
+
+	protected.GET("/players", playerHandler.List)
+	protected.POST("/players", playerHandler.Create)
+	protected.GET("/players/:id", playerHandler.Get)
+	protected.PUT("/players/:id", playerHandler.Update)
+	protected.DELETE("/players/:id", playerHandler.Delete)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
