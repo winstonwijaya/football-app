@@ -84,15 +84,18 @@ make docker-logs    # docker compose logs -f
 its test script saves the returned token into the `access_token` collection
 variable automatically, so every other request just works via Bearer auth.
 
-The collection assumes a fresh database (exactly what `docker compose up`
-gives you): Home team = id 1, Away team = id 2, players 1-3, match = id 1.
-Running the top-level folders (Health, Auth, Teams, Players, Matches,
-Reports) in order walks through the full lifecycle: create two teams, create
-three players, schedule a match, report its result (including an own goal),
-then pull the match report. The **Cleanup** folder is separate at the bottom
-and meant to be run on its own — it deletes a team/player/match that earlier
-requests depend on, and deliberately demonstrates that deleting a `Played`
-match is rejected with `409`.
+Folders mirror the resources 1:1 (Teams, Players, Matches, Reports), each
+self-contained with its own List/Create/Get/Update/Delete in the order the
+endpoints are listed in the spec — this is a reference/exploration
+collection, not a scripted demo. Requests assume IDs from a fresh database
+(team/player/match = 1, a second team = 2), and running an entire folder or
+the whole collection straight through isn't guaranteed to work cleanly —
+e.g. `Teams > Delete Team` will break a later `Players > Create Player` that
+references it. Run what you need, substituting IDs from earlier responses
+as you go. The one exception: `Matches` is ordered so `Report Match Result`
+runs before `Delete Match`, so running that folder top-to-bottom
+deliberately demonstrates the immutability rule — deleting a `Played` match
+correctly returns `409` instead of a confusing `404`.
 
 ---
 
@@ -176,9 +179,24 @@ implementing.
   a historical match's recorded result.
 
 **Matches**
-- A team can play at most one match per calendar day. A **cancelled** match
-  doesn't count against this limit — a team can be rescheduled into a day
-  where they previously had a match that got cancelled.
+- `match_datetime` itself is timezone-aware (clients should send a full
+  ISO-8601 timestamp with an explicit offset, e.g.
+  `2026-10-01T06:00:00+07:00`) and is stored/compared as an absolute
+  instant — no ambiguity there.
+- The `from`/`to` filters on `GET /matches` (and the "one match per team per
+  day" rule below) are different: they only take a bare `YYYY-MM-DD` date,
+  which is inherently ambiguous without an agreed timezone — there's no
+  universal frontend convention for what calendar day a bare date means.
+  **This API assumes WIB (Asia/Jakarta, UTC+7)** for both: `from`/`to` cover
+  that calendar day's full 00:00:00–23:59:59.999999999 WIB range, and the
+  per-day conflict check groups matches by their WIB calendar day, not UTC.
+  A match at 06:00 WIB is `23:00 UTC` the *previous* day — without this,
+  both the list filter and the conflict rule would silently use the wrong
+  day for any match outside UTC daytime hours.
+- A team can play at most one match per calendar day (WIB, per above). A
+  **cancelled** match doesn't count against this limit — a team can be
+  rescheduled into a day where they previously had a match that got
+  cancelled.
 - Match date and time are stored in a single column (`match_datetime`), not
   split into separate date/time columns.
 - `PUT /matches/:id` and result reporting are deliberately split: `PUT` can
@@ -210,6 +228,22 @@ implementing.
   `away_score` (per team, excluding own goals from the scorer's own tally)
   or the whole report is rejected with `422` — no partial acceptance.
 - Reporting a result twice on the same match returns `409`.
+
+**Reports**
+- `home_team_cumulative_wins`/`away_team_cumulative_wins` are each team's
+  **overall** win total as of that match's date — not wins restricted to
+  that specific home/away position. A team that won once at home and once
+  away has a cumulative count of 2 either way; the field name only
+  indicates *which team* (whoever is currently in that slot for *this*
+  match), not that the count itself is position-specific. Verified against
+  a scenario built specifically to distinguish the two readings: a team
+  that won as home in an earlier match still carries that win into its
+  cumulative total when it later appears in the away slot.
+- Top scorer excludes own goals from a player's personal tally — an own
+  goal counts toward the match score but isn't credited as that player
+  "scoring."
+- A 0-0 draw, or a match decided entirely by own goals, has no top scorer
+  (`top_scorer` is omitted from the response, not a zero-goal entry).
 
 **API design (beyond the literal endpoint list)**
 - Pagination (`page`/`limit`) was extended to the Players, Matches, and

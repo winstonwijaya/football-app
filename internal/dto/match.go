@@ -21,11 +21,17 @@ type UpdateMatchRequest struct {
 }
 
 // ListMatchesQuery — GET /api/v1/matches?status=&team_id=&from=&to=&page=&limit=
+//
+// From/To are plain "YYYY-MM-DD" dates, deliberately not parsed into
+// time.Time here: they're interpreted as calendar days in the app's fixed
+// business timezone (WIB, UTC+7), not UTC — see
+// service.jakartaDayBounds. Kept as strings so that conversion happens in
+// one place instead of relying on Gin's binding to guess a timezone.
 type ListMatchesQuery struct {
-	Status string     `form:"status" binding:"omitempty,oneof=Scheduled Played Cancelled"`
-	TeamID *int64     `form:"team_id"`
-	From   *time.Time `form:"from" time_format:"2006-01-02"`
-	To     *time.Time `form:"to" time_format:"2006-01-02"`
+	Status string `form:"status" binding:"omitempty,oneof=Scheduled Played Cancelled"`
+	TeamID *int64 `form:"team_id"`
+	From   string `form:"from" binding:"omitempty,datetime=2006-01-02"`
+	To     string `form:"to" binding:"omitempty,datetime=2006-01-02"`
 	PaginationQuery
 }
 

@@ -181,13 +181,19 @@ func (r *matchRepository) ReportResult(ctx context.Context, match *model.Match, 
 // a non-cancelled match on the same calendar date as matchDatetime,
 // excluding excludeMatchID (0 on create, since ids start at 1). Must run
 // inside the same transaction as the write it's guarding.
+//
+// "Same calendar date" is evaluated in WIB (Asia/Jakarta, UTC+7) — the
+// app's fixed business timezone — not the DB session's timezone (UTC).
+// Without this, a 6am WIB match and an 8pm WIB match on the same Jakarta
+// calendar day could land on different UTC calendar days and incorrectly
+// bypass the "one match per team per day" rule.
 func hasScheduleConflict(tx *gorm.DB, homeTeamID, awayTeamID int64, matchDatetime time.Time, excludeMatchID int64) (bool, error) {
 	var count int64
 	err := tx.Model(&model.Match{}).
 		Where("deleted_at IS NULL").
 		Where("status <> ?", model.MatchStatusCancelled).
 		Where("id <> ?", excludeMatchID).
-		Where("DATE(match_datetime) = DATE(?)", matchDatetime).
+		Where("DATE(match_datetime AT TIME ZONE 'Asia/Jakarta') = DATE(? AT TIME ZONE 'Asia/Jakarta')", matchDatetime).
 		Where("home_team_id IN (?, ?) OR away_team_id IN (?, ?)", homeTeamID, awayTeamID, homeTeamID, awayTeamID).
 		Count(&count).Error
 	return count > 0, err

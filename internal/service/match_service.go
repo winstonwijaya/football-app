@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -17,6 +18,26 @@ const (
 	scheduleConflictMessage = "a team in this match already has a match scheduled on this date"
 	resultConflictMessage   = "match result has already been reported"
 )
+
+// jakartaOffset is the app's fixed business timezone (WIB, UTC+7) used to
+// interpret the from/to list filter's bare "YYYY-MM-DD" dates as calendar
+// days. A fixed offset, not time.LoadLocation("Asia/Jakarta"): WIB has had
+// no DST for decades so they're equivalent in practice, and a fixed offset
+// has no tzdata dependency — LoadLocation would silently fail on the
+// alpine-based Docker image, which doesn't have tzdata installed.
+var jakartaOffset = time.FixedZone("WIB", 7*60*60)
+
+// jakartaDayBounds parses a "YYYY-MM-DD" date as a calendar day in WIB and
+// returns its [start, end] instants (end is 23:59:59.999999999 WIB), so a
+// day-range filter covers the whole day instead of a single instant.
+func jakartaDayBounds(dateStr string) (start, end time.Time, err error) {
+	start, err = time.ParseInLocation("2006-01-02", dateStr, jakartaOffset)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	end = start.Add(24*time.Hour - time.Nanosecond)
+	return start, end, nil
+}
 
 type MatchService struct {
 	matches repository.MatchRepository
@@ -70,11 +91,27 @@ func (s *MatchService) Get(ctx context.Context, id int64) (*dto.MatchResponse, e
 }
 
 func (s *MatchService) List(ctx context.Context, query dto.ListMatchesQuery) ([]dto.MatchResponse, int64, error) {
+	var from, to *time.Time
+	if query.From != "" {
+		start, _, err := jakartaDayBounds(query.From)
+		if err != nil {
+			return nil, 0, apperror.Validation("invalid from date", map[string]string{"from": "must be YYYY-MM-DD"})
+		}
+		from = &start
+	}
+	if query.To != "" {
+		_, end, err := jakartaDayBounds(query.To)
+		if err != nil {
+			return nil, 0, apperror.Validation("invalid to date", map[string]string{"to": "must be YYYY-MM-DD"})
+		}
+		to = &end
+	}
+
 	matches, total, err := s.matches.List(ctx, repository.MatchFilter{
 		Status: query.Status,
 		TeamID: query.TeamID,
-		From:   query.From,
-		To:     query.To,
+		From:   from,
+		To:     to,
 		Page:   query.Page,
 		Limit:  query.Limit,
 	})
